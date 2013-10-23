@@ -13,18 +13,9 @@
 
 using namespace std;
 
-//static jvmtiEnv* jvmti = NULL;
 static vector<string> log;
 static const jvmtiError &ERROR_NONE = JVMTI_ERROR_NONE;
 static int nest = 0;
-
-static void pritMethodCallInfo(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
-		jmethodID method) {
-	jclass clazz;
-	jvmtiThreadInfo threadInfo;
-	threadInfo.name = NULL;
-	cout << "print method0" << endl;
-}
 
 static bool excludes(jvmtiEnv* jvmti, jmethodID method) {
 	jvmtiError error;
@@ -65,14 +56,65 @@ static bool excludes(jvmtiEnv* jvmti, jmethodID method) {
 		padding += "  ";
 	}
 	cout << padding << classSignature << "." << name << endl;
-	return true;
+
+	return false;
+}
+
+/**
+ * クラスが使えるようになったら呼ばれるコールバック
+ *
+ */
+static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
+		jclass klass) {
+	char* csig = NULL;
+	char* gcsig = NULL;
+	jint count;
+	jfieldID* fields;
+	jvmtiError error;
+	int i;
+
+	jvmti->GetClassSignature(klass, &csig, &gcsig);
+	error = jvmti->GetClassFields(klass, &count, &fields);
+	if (error != ERROR_NONE) {
+		cerr << "errror: GetClassFields:" << error << endl;
+	}
+	cout << "CPrepare[" << csig << "] field:" << count << endl;
+
+	for (i = 0; i < count; i++) {
+		error = jvmti->SetFieldAccessWatch(klass, fields[i]);
+		if (error != ERROR_NONE) {
+			cerr << "error: SetFieldAccessWatch:" << error << endl;
+		} else {
+//			cout << "ok:" << endl;
+		}
+		error = jvmti->SetFieldModificationWatch(klass, fields[i]);
+		if (error != ERROR_NONE) {
+			cerr << "error: SetFieldModification:" << error << endl;
+		} else {
+//			cout << "ok:" << endl;
+		}
+	}
+}
+
+static void JNICALL fieldAccess(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
+		jthread thread, jmethodID method, jlocation location,
+		jclass field_klass, jobject object, jfieldID field) {
+//	cout << "FAccess" << endl;
+
+}
+
+static void JNICALL fieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
+		jthread thread, jmethodID method, jlocation location,
+		jclass field_klass, jobject object, jfieldID field, char signature_type,
+		jvalue new_value) {
+//	cout << "FModification" << endl;
 }
 
 /**
  * JavaVM上でメソッドが実行されたら呼び出される。
  *
  */
-static void JNICALL mymethodEntry(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
+static void JNICALL methodEntry(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
 		jmethodID method) {
 	static int count = 0;
 	stringstream ss;
@@ -83,6 +125,14 @@ static void JNICALL mymethodEntry(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
 	}
 	ss << "MEntry[" << count << "]";
 	log.push_back(ss.str());
+
+//	jint* freadDep;
+//	jvmtiError error;
+//	error = jvmti->GetFrameCount(thread, freadDep);
+//	cout << error << endl;
+//	cout << freadDep << endl;
+//	jobject* localVal = NULL;
+//	jvmti->GetLocalObject(thread, &freadDep, &freadDep, localVal);
 
 }
 
@@ -118,9 +168,13 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 		return JNI_ERR;
 	}
 
-	memset(&capa, 0, sizeof(jvmtiCapabilities));
+	memset(&capa, JVMTI_ENABLE, sizeof(jvmtiCapabilities));
 	capa.can_generate_method_entry_events = JVMTI_ENABLE;
 	capa.can_generate_method_exit_events = JVMTI_ENABLE;
+	capa.can_generate_field_access_events = JVMTI_ENABLE;
+	capa.can_generate_field_modification_events = JVMTI_ENABLE;
+	capa.can_access_local_variables = JVMTI_ENABLE;
+
 	error = jvmti->AddCapabilities(&capa);
 	if (error != ERROR_NONE) {
 		cerr << "ERROR: jvmti->AddCapabilities" << endl;
@@ -129,8 +183,11 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 
 	memset(&callbacks, 0, sizeof(jvmtiEventCallbacks));
 	callbacks.VMInit = &vmInit;
-	callbacks.MethodEntry = &mymethodEntry;
+	callbacks.MethodEntry = &methodEntry;
 	callbacks.MethodExit = &methodExit;
+	callbacks.ClassPrepare = &classPrepare;
+	callbacks.FieldAccess = &fieldAccess;
+	callbacks.FieldModification = &fieldModification;
 
 	jvmti->SetEventCallbacks(&callbacks, (jint) sizeof(callbacks));
 	jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL);
@@ -138,12 +195,21 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 	NULL);
 	jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_EXIT,
 	NULL);
+//	jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP,
+//	NULL);
+	jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_PREPARE,
+	NULL);
+	jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIELD_ACCESS,
+	NULL);
+	jvmti->SetEventNotificationMode(JVMTI_ENABLE,
+			JVMTI_EVENT_FIELD_MODIFICATION, NULL);
 	return JNI_OK;
 }
 
 JNIEXPORT void JNICALL Agent_OnUnload(JavaVM* vm) {
 	cout << "*** Agent UnLoad!!" << endl;
 	cout << "-------LOG------------" << endl;
+	return;
 	vector<string>::iterator it = log.begin();
 	while (it != log.end()) {
 		cout << *it << endl;
