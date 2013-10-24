@@ -4,20 +4,20 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
-../src/MethodTrace.cpp 
+../src/AgentSeed.cpp 
 
 C_SRCS += \
 ../src/oldMethodTrace.c 
 
 OBJS += \
-./src/MethodTrace.o \
+./src/AgentSeed.o \
 ./src/oldMethodTrace.o 
 
 C_DEPS += \
 ./src/oldMethodTrace.d 
 
 CPP_DEPS += \
-./src/MethodTrace.d 
+./src/AgentSeed.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

@@ -1,5 +1,5 @@
 /*
- * MethodTrace.cpp
+ * AgentSeed.cpp
  *
  *  Created on: 2013/10/22
  *      Author: wtnbsts
@@ -96,14 +96,17 @@ static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 	}
 }
 
-static void JNICALL fieldAccess(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
-		jthread thread, jmethodID method, jlocation location,
-		jclass field_klass, jobject object, jfieldID field) {
-//	cout << "FAccess" << endl;
-
+static void JNICALL fieldAccess(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
+		jmethodID method, jlocation location, jclass field_klass,
+		jobject object, jfieldID field) {
+	char* fname = NULL;
+	char* fsig = NULL;
+	char* fgsig = NULL;
+	jvmti->GetFieldName(field_klass, field, &fname, &fsig, &fgsig);
+	cout << "FAccess:" << fname << endl;
 }
 
-static void JNICALL fieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
+static void JNICALL fieldModification(jvmtiEnv *jvmti, JNIEnv* jni,
 		jthread thread, jmethodID method, jlocation location,
 		jclass field_klass, jobject object, jfieldID field, char signature_type,
 		jvalue new_value) {
