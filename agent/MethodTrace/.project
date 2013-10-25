@@ -3,7 +3,8 @@
 	<name>MethodTrace</name>
 	<comment></comment>
 	<projects>
-		<project>header</project>
+		<project>Header</project>
+		<project>java</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
