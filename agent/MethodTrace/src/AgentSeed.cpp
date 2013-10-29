@@ -14,7 +14,7 @@
 
 #define DEBUG_METHOD
 #define DEBUG_FIELD_
-#define DEBUG_CLASS_
+#define DEBUG_CLASS
 
 #define EXCLUDES(jvmti,method) if (excludes(jvmti, method)) {return;}
 
@@ -37,7 +37,6 @@ static bool excludes(jvmtiEnv* jvmti, jmethodID method) {
 	char* msig = NULL;
 	char* gmsig = NULL;
 //	int i;
-
 	error = jvmti->GetMethodDeclaringClass(method, &clazz);
 	if (error != ERROR_NONE) {
 		cerr << "in [static bool excludes(jvmtiEnv* jvmti, jmethodID method)]"
@@ -75,6 +74,9 @@ static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 	jfieldID* fields;
 	jvmtiError error;
 	int i;
+	string package, cname;
+	Jtil jtil = Jtil(jvmti);
+	jtil.GetClassName(klass, package, cname);
 
 	jvmti->GetClassSignature(klass, &csig, &gcsig);
 	error = jvmti->GetClassFields(klass, &count, &fields);
@@ -83,7 +85,14 @@ static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 	}
 
 #ifdef DEBUG_CLASS
-	cout << "CPrepare[" << csig << "] field:" << count << endl;
+	string from = "/", to = ".";
+	package = jtil.ReplaceStr(package, from, to);
+	if (package.size() > 0) {
+		cout << "CPrepare[" << package << "." << cname << "] field:" << count
+				<< endl;
+	} else {
+		cout << "CPrepare[" << cname << "] field:" << count << endl;
+	}
 #endif
 
 	for (i = 0; i < count; i++) {
@@ -141,11 +150,16 @@ static void JNICALL methodEntry(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
 	nest++;
 	EXCLUDES(jvmti, method);
 
-	char* key;
 	Jtil jtil = Jtil(jvmti);
-
-	jtil.GetMethodKey(method, &key);
-	cout << "KEY:" << key << endl;
+//	char* key;
+//	jtil.GetMethodKey(method, &key);
+//	cout << "KEY:" << key << endl;
+	string key;
+	jtil.GetMethodKey(method, key);
+//	cout << "KEY:" << key << endl;
+//	jclass klass;
+//	jvmti->GetMethodDeclaringClass(method, &klass);
+	string package, cname;
 
 #ifdef DEBUG_METHOD
 	char* mname;

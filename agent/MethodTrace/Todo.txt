@@ -1,0 +1,5 @@
+Jtil::GetClassNameでパッケージ名とクラス名の取得
+Jtil::GetMethodKeyでメソッドの文字列表現を取得
+Jtil::
+
+フィルタークラスの実装
