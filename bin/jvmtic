@@ -1,0 +1,106 @@
+#!/bin/sh
+# usage : jvmtic source.c
+
+# simple compile shell for jvmti
+# 作りかけ...
+
+# begin
+#Set source file name
+SRC_NAME=${1}
+COMPILER=gcc
+OPTION="-Wall"
+LIB_NAME=lib`echo ${SRC_NAME} | sed -e "s/\.c/.dylib/"`
+HEADER_DIR=
+STATUS=0
+# end
+
+# begin functions
+function parse_arguments(){
+    local input_file=
+    local options=
+    local mode=
+}
+
+function get_java_version(){
+    local java_version=`java -version 2>&1 | grep 'version'`
+    # ex: java_version=java version "1.7.0_45"
+    java_version=`echo $java_version | sed -e 's/^.*\"\(.*\)\".*$/\1/g'`
+    # ex: java_version=1.7.0_45
+    echo $java_version
+}
+
+function get_java_home(){
+    echo $JAVA_HOME
+}
+
+function get_lib_name(){
+    local input_file=$1
+    #echo $input_file
+}
+
+function get_header_dir(){
+    local header_dir=/usr/include
+    #echo $header_dir
+}
+
+function help(){
+    echo " usage: `basename ${0}` Agent.c"
+    echo
+    echo " Option:"
+    echo "  --copt=\"-g -Wall -L /opt/local/lib\""
+    echo "  --init=AGENT_NAME"
+    echo 
+    echo " ex1:"
+    echo "  `whoami`[1]% `basename ${0}` Agent.c"
+    echo "  `whoami`[2]% javac HelloWorld.java"
+    echo "  `whoami`[3]% java -agentlib:Agent HelloWorld"
+    echo "  or"
+    echo "  `whoami`[3]% java -agentpath:/FULLPATH/Agent HelloWorld"
+    echo
+    echo " ex2:"
+    echo "  `whoami`[1]% `basename ${0}` --init=MyTraceAgent"
+    echo "  `whoami`[]% ..."
+}
+
+function sample_java(){
+    local code=
+}
+function sample_agent(){
+    local code=
+}
+# end functions
+
+if [ $# = 0 ] ;then
+    #echo ${0}: no input source file...
+    echo no input source file...
+    help
+    exit
+fi
+
+#Set command
+#include file dir
+if [ `uname -s` = "Darwin" ]; then
+    #HEADER_DIR="-I /System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/"
+    #HEADER_DIR="-I /Library/Java/JavaVirtualMachines/jdk1.7.0_45.jdk/Contents/Home/include"
+    HEADER_DIR="-I /Library/Java/JavaVirtualMachines/jdk"`get_java_version`".jdk/Contents/Home/include"
+    HEADER_DIR=${HEADER_DIR}/darwin" "${HEADER_DIR}
+else
+    HEADER_DIR="/usr/jdk/jdk1.6.0_21/include"
+    HEADER_DIR="-I ${HEADER_DIR} -I ${HEADER_DIR}/solaris"
+fi
+
+COMMAND="${COMPILER} -shared -fpic ${OPTION} ${HEADER_DIR} ${SRC_NAME} -o ${LIB_NAME}"
+#echo COMMAND : ${COMMAND}
+#echo
+
+#exec command
+${COMMAND}
+
+STATUS=$?
+if [ $STATUS ] ; then
+    exit;
+fi
+
+#change mode maked library
+chmod 755 ${LIB_NAME}
+
