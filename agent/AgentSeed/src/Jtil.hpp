@@ -10,6 +10,7 @@
 
 #include <jvmti.h>
 #include <string>
+#include <sstream>
 
 using namespace std;
 
@@ -32,8 +33,9 @@ public:
 	Jtil(jvmtiEnv* jvmti) {
 		this->jvmti = jvmti;
 	}
-	;
-	jvmtiError GetClassName(jclass& klass, string& package, string& name) {
+
+	jvmtiError GetClassName(jclass& klass, string& package,
+			string& simpleName) {
 		jvmtiError error;
 		char *csig, *gcsig;
 		string longName;
@@ -45,35 +47,50 @@ public:
 		findIndex = longName.rfind('/');
 		if (findIndex == string::npos) {
 			package = "";
-			name = longName.substr(1, longName.size() - 2);
+			simpleName = longName.substr(1, longName.size() - 2);
 			return JVMTI_ERROR_NONE;
 		}
 		package = longName.substr(1, findIndex - 1);
-		name = longName.substr(findIndex + 1, longName.size() - findIndex - 2);
+		simpleName = longName.substr(findIndex + 1,
+				longName.size() - findIndex - 2);
 		return JVMTI_ERROR_NONE;
 	}
-	;
+
+	jvmtiError GetClassName(jclass& klass, string& package, string& simpleName,
+			string& canonicalName) {
+		jvmtiError error = GetClassName(klass, package, simpleName);
+		CHECK_RESULT("GetClassName", error);
+		canonicalName = string();
+		if (package.size() != 0) {
+			canonicalName.append(package);
+			canonicalName.append("/");
+		}
+		canonicalName.append(simpleName);
+		return JVMTI_ERROR_NONE;
+	}
 
 	//	jvmtiError GetMethodKey(jmethodID method, char** key) {
 	jvmtiError GetMethodKey(jmethodID& method, string& key) {
-		jclass klass = NULL;
-		char* csig;
-		char* gcsig;
-		char* msig;
-//		(&jvmti)->GetMethodDeclaringClass(method, &klass);
-		jvmti->GetMethodDeclaringClass(method, &klass);
-		jvmti->GetClassSignature(klass, &csig, &gcsig);
-		jvmti->GetClassSignature(klass, &csig, &gcsig);
+		jvmtiError error;
+		jclass klass;
+		char *csig, *gcsig;
+		char *mname, *msig, *mgsig;
+		stringstream ss;
 
-		key = string(csig);
+		error = jvmti->GetMethodDeclaringClass(method, &klass);
+		CHECK_RESULT("GetMethodKey0", error);
+		error = jvmti->GetClassSignature(klass, &csig, &gcsig);
+		CHECK_RESULT("GetMethodKey1", error);
+		error = jvmti->GetMethodName(method, &mname, &msig, &mgsig);
+		CHECK_RESULT("GetMethodKey2", error);
+		ss << csig << "#" << mname << msig;
+		key = ss.str();
 		return JVMTI_ERROR_NONE;
 	}
-	;
 
 	jvmtiError GetPackageNameByClass(jclass& klass, string& package) {
 		return JVMTI_ERROR_NONE;
 	}
-	;
 
 //private:
 public:

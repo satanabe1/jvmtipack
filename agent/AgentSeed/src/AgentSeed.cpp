@@ -14,7 +14,7 @@
 
 #define DEBUG_METHOD
 #define DEBUG_FIELD_
-#define DEBUG_CLASS
+#define DEBUG_CLASS_
 
 #define EXCLUDES(jvmti,method) if (excludes(jvmti, method)) {return;}
 
@@ -74,9 +74,9 @@ static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 	jfieldID* fields;
 	jvmtiError error;
 	int i;
-	string package, cname;
+	string package, simpleName, cannonicalName;
 	Jtil jtil = Jtil(jvmti);
-	jtil.GetClassName(klass, package, cname);
+	jtil.GetClassName(klass, package, simpleName, cannonicalName);
 
 	jvmti->GetClassSignature(klass, &csig, &gcsig);
 	error = jvmti->GetClassFields(klass, &count, &fields);
@@ -86,13 +86,8 @@ static void JNICALL classPrepare(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 
 #ifdef DEBUG_CLASS
 	string from = "/", to = ".";
-	package = jtil.ReplaceStr(package, from, to);
-	if (package.size() > 0) {
-		cout << "CPrepare[" << package << "." << cname << "] field:" << count
-				<< endl;
-	} else {
-		cout << "CPrepare[" << cname << "] field:" << count << endl;
-	}
+	cannonicalName = jtil.ReplaceStr(cannonicalName, from, to);
+	cout << "CPrepare[" << cannonicalName << "] field:" << count << endl;
 #endif
 
 	for (i = 0; i < count; i++) {
@@ -146,20 +141,13 @@ static void JNICALL fieldModification(jvmtiEnv *jvmti, JNIEnv* jni,
  */
 static void JNICALL methodEntry(jvmtiEnv* jvmti, JNIEnv* env, jthread thread,
 		jmethodID method) {
-//	jvmtiError error;
+	jvmtiError error;
 	nest++;
 	EXCLUDES(jvmti, method);
-
 	Jtil jtil = Jtil(jvmti);
-//	char* key;
-//	jtil.GetMethodKey(method, &key);
-//	cout << "KEY:" << key << endl;
 	string key;
-	jtil.GetMethodKey(method, key);
-//	cout << "KEY:" << key << endl;
-//	jclass klass;
-//	jvmti->GetMethodDeclaringClass(method, &klass);
-	string package, cname;
+	error = jtil.GetMethodKey(method, key);
+//	cout << key << endl;
 
 #ifdef DEBUG_METHOD
 	char* mname;
