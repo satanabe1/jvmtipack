@@ -27,19 +27,24 @@ using namespace std;
 #endif
 
 /**
- * スレッドがはじまる際に呼び出されるコールバック関数
- * Agent_OnLoad関数の "callbacks.VMStart = &vmStart;" でコールバックとして登録されている
+ * Agent_OnLoad関数の "callbacks.ClassFileLoadHook = &classFileLoadHook;" でコールバックとして登録されている
  */
-static void threadStart(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread) {
-	cout << "** threadStart" << endl;
+static void classFileLoadHook(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
+		jclass class_being_redefined, jobject loader, const char* name,
+		jobject protection_domain, jint class_data_len,
+		const unsigned char* class_data, jint* new_class_data_len,
+		unsigned char** new_class_data) {
+	cout << "file load " << name << endl;
 }
 
-/**
- * スレッドが終了する際に呼び出されるコールバック関数
- * Agent_OnLoad関数の "callbacks.VMInit = &vmInit;" でコールバックとして登録されている
- */
-static void threadEnd(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread) {
-	cout << "** threadEnd" << endl;
+static void classLoad(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+		jclass klass) {
+	cout << "load" << endl;
+}
+
+static void classPrepare(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+		jclass klass) {
+	cout << "prepare" << endl;
 }
 
 /**
@@ -73,13 +78,17 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 	// コールバック関数テーブルを初期化する
 	memset(&callbacks, JVMTI_DISABLE, sizeof(jvmtiEventCallbacks));
 	// コールバック関数テーブルに関数を登録する
-	callbacks.ThreadStart = &threadStart;
-	callbacks.ThreadEnd = &threadEnd;
+	callbacks.ClassFileLoadHook = &classFileLoadHook;
+	callbacks.ClassLoad = &classLoad;
+	callbacks.ClassPrepare = &classPrepare;
 
 	// コールバック用のイベントの発生を有効化する // これをしないと，コールバック関数が実行されない
-	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START,
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
+			JVMTI_EVENT_CLASS_FILE_LOAD_HOOK,
+			NULL);
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_LOAD,
 	NULL);
-	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_END,
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_PREPARE,
 	NULL);
 
 	// コールバック関数テーブルをエージェントにセットする

@@ -27,19 +27,44 @@ using namespace std;
 #endif
 
 /**
- * スレッドがはじまる際に呼び出されるコールバック関数
- * Agent_OnLoad関数の "callbacks.VMStart = &vmStart;" でコールバックとして登録されている
+ * SetFieldAccessWatch で登録されたフィールドへのアクセスでしか，コールバックされない
  */
-static void threadStart(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread) {
-	cout << "** threadStart" << endl;
+static void fieldAccess(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+		jmethodID method, jlocation location, jclass field_klass,
+		jobject object, jfieldID field) {
+	char *fname, *fsig, *fgsig;
+	jvmti_env->GetFieldName(field_klass, field, &fname, &fsig, &fgsig);
+	cout << "FieldAccess " << fname << endl;
 }
 
 /**
- * スレッドが終了する際に呼び出されるコールバック関数
- * Agent_OnLoad関数の "callbacks.VMInit = &vmInit;" でコールバックとして登録されている
+ * SetFieldModificationWatch で登録されたフィールドの変更でしか，コールバックされない
  */
-static void threadEnd(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread) {
-	cout << "** threadEnd" << endl;
+static void fieldModification(jvmtiEnv *jvmti_env, JNIEnv* jni_env,
+		jthread thread, jmethodID method, jlocation location,
+		jclass field_klass, jobject object, jfieldID field, char signature_type,
+		jvalue new_value) {
+	char *fname, *fsig, *fgsig;
+	jvmti_env->GetFieldName(field_klass, field, &fname, &fsig, &fgsig);
+	cout << "FieldModification " << fname << endl;
+}
+
+/**
+ * クラスが使えるようになったら，そのクラスのフィールドの一覧を GetClassFields で取得し，
+ * 帰ってきたフィールドの一覧に対して SetFieldAccessWatch, SetFieldModificationWatch で，
+ * フィールドアクセスと，フィールド変更を監視する
+ */
+static void classPrepare(jvmtiEnv *jvmti_env, JNIEnv* jni_env, jthread thread,
+		jclass klass) {
+	cout << "prepare" << endl;
+	jint count;
+	jfieldID* field;
+	int i;
+	jvmti_env->GetClassFields(klass, &count, &field);
+	for (i = 0; i < count; i++) {
+		jvmti_env->SetFieldAccessWatch(klass, field[i]);
+		jvmti_env->SetFieldModificationWatch(klass, field[i]);
+	}
 }
 
 /**
@@ -66,6 +91,9 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 
 	// エージェントの権限を初期化する
 	memset(&capa, JVMTI_DISABLE, sizeof(jvmtiCapabilities));
+	// 必要な権限を有効化する
+	capa.can_generate_field_access_events = JVMTI_ENABLE;
+	capa.can_generate_field_modification_events = JVMTI_ENABLE;
 	// エージェントに権限を設定する // 今回はあまり意味が無い
 	error = jvmti_env->AddCapabilities(&capa);
 	CHECK_JVMTI_RESULT("jvmti->AddCapabilities", error); // エラー処理
@@ -73,14 +101,17 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
 	// コールバック関数テーブルを初期化する
 	memset(&callbacks, JVMTI_DISABLE, sizeof(jvmtiEventCallbacks));
 	// コールバック関数テーブルに関数を登録する
-	callbacks.ThreadStart = &threadStart;
-	callbacks.ThreadEnd = &threadEnd;
+	callbacks.ClassPrepare = &classPrepare;
+	callbacks.FieldAccess = &fieldAccess;
+	callbacks.FieldModification = &fieldModification;
 
 	// コールバック用のイベントの発生を有効化する // これをしないと，コールバック関数が実行されない
-	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START,
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_PREPARE,
 	NULL);
-	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_END,
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIELD_ACCESS,
 	NULL);
+	jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
+			JVMTI_EVENT_FIELD_MODIFICATION, NULL);
 
 	// コールバック関数テーブルをエージェントにセットする
 	error = jvmti_env->SetEventCallbacks(&callbacks, (jint) sizeof(callbacks));
